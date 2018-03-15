@@ -1,0 +1,30 @@
+{
+  "name": "bitbucket-pullrequest-resource",
+  "version": "1.0.0",
+  "description": "Concourse resource for checking/fetching bitbucket cloud pullrequests",
+  "scripts": {
+    "build": "docker build --tag mperrotte/bitbucket-pullrequest-resource .",
+    "push": "docker push mperrotte/bitbucket-pullrequest-resource:latest",
+    "deploy": "npm run build && npm run push",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "concourse",
+    "resource",
+    "bitbucket",
+    "pullrequests",
+    "cloud"
+  ],
+  "author": "Michael Perrotte <mike@mikecorp.ca>",
+  "license": "MIT",
+  "dependencies": {
+    "lodash": "^4.17.5",
+    "proxyquire": "^1.8.0",
+    "request": "^2.83.0",
+    "sync-request": "^5.0.0",
+    "uuid": "^3.2.1"
+  },
+  "devDependencies": {
+    "semistandard": "^12.0.1"
+  }
+}

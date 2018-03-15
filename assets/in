@@ -1,0 +1,136 @@
+#! /usr/bin/env node
+'use strict';
+
+const readline = require('readline');
+const exec = require('child_process').execSync;
+const { sep } = require('path');
+const req = require('sync-request');
+const fs = require('fs');
+const os = require('os');
+
+const read = readline.createInterface({
+  input: process.stdin,
+  output: process.stdout
+});
+
+let output;
+
+// TODO(mperrotte): CLEAN UP ALL OF THIS NONSENSE
+read.on('line', (input) => {
+  console.error(input);
+  console.error('args:', process.argv);
+  console.error('env:', process.env);
+  const destination = process.argv[2];
+  // TESTING(mperrotte): listing out what's in the destination direcotry
+  const ls = fs.readdirSync(destination, 'utf8');
+  console.error('ls (destination):', ls);
+
+  const payload = JSON.parse(input);
+  const api = 'https://bitbucket.org/api/2.0';
+
+  // INFO(mperrotte): source values
+  const uri = payload.source.uri;
+  const username = payload.source.username;
+  const password = payload.source.password;
+  const project = payload.source.project;
+  const repo = payload.source.repository;
+  // const branch = payload.source.branch;
+  const privateKey = payload.source.private_key;
+
+  const currentVersion = payload.version;
+
+  // NOTE(mperrotte): doing this to get specific info about PR (necessary?)
+  const auth = Buffer.from(`${username}:${password}`).toString('base64');
+  const prUri = `${api}/repositories/${project}/${repo}/pullrequests/${currentVersion.id}`;
+
+  const res = req(
+    'GET',
+    prUri,
+    {
+      headers: {
+        Authorization: `Basic ${auth}`
+      }
+    }
+  );
+  const data = JSON.parse(res.getBody());
+
+  const gitClone = `git clone -b ${currentVersion.branch} --single-branch ${uri} ${destination}`;
+  const execEnv = setGetAuth(privateKey);
+
+  console.error('Cloning...');
+  const cloneLogs = exec(`${gitClone}`, { encoding: 'utf8', env: execEnv });
+  console.error(cloneLogs);
+
+  console.error('Setting SHA...');
+  const gitReset = `git reset --hard ${currentVersion.commit}`;
+  const resetLogs = exec(`${gitReset}`, { encoding: 'utf8', cwd: destination, env: execEnv });
+  console.error(resetLogs);
+
+  // TESTING(mperrotte): checking current SHA for repo
+  const currentSHA = exec(`git log -1`, { encoding: 'utf8', cwd: destination, env: execEnv });
+  console.error(currentSHA);
+
+  output = {
+    version: currentVersion,
+    metadata: [
+      { name: 'id', value: currentVersion.id },
+      { name: 'title', value: data.title },
+      { name: 'url', value: data.links.html.href },
+      { name: 'author', value: data.author.display_name },
+      { name: 'commit', value: currentVersion.commit },
+      { name: 'feature-branch', value: currentVersion.branch },
+      { name: 'upstream-branch', value: data.destination.branch.name },
+      { name: 'pullrequest updated', value: data.updated_on }
+    ]
+  };
+  const parser = /(feature)\/([^\s]{4}-[\d]*)/g;
+  const segments = parser.exec(data.source.branch.name);
+  fs.writeFileSync(`${destination}/pull-request-info`, JSON.stringify(output), 'utf8');
+  fs.writeFileSync(`${destination}/id`, currentVersion.id, 'utf8');
+  fs.writeFileSync(`${destination}/branch`, data.source.branch.name, 'utf8');
+  fs.writeFileSync(`${destination}/ticket`, segments[2], 'utf8');
+  console.error(output);
+  read.close();
+});
+
+read.on('close', () => {
+  console.log(JSON.stringify(output));
+  process.exit(0);
+});
+
+function setGetAuth (key) {
+  const tmpDir = os.tmpdir();
+  const tmpFolder = fs.mkdtempSync(`${tmpDir}${sep}`);
+  const keyFile = `${tmpFolder}/git-resource-private-key`;
+  const writeOptions = { encoding: 'utf8', mode: parseInt('0600', 8) };
+  fs.writeFileSync(`${keyFile}`, key, writeOptions);
+  const sshAgentExec = exec('ssh-agent', { encoding: 'utf8' });
+  console.error(sshAgentExec);
+  console.error(process.env);
+  const cmds = sshAgentExec.split('\n').filter(c => c);
+  const envVars = cmds.reduce((acc, cmd, i) => {
+    if (i < 2) {
+      const data = cmd.split(' ')[0];
+      const key = data.split('=')[0];
+      const value = data.split('=')[1].slice(0, data.split('=')[1].length - 1);
+      acc[key] = value;
+    }
+    return acc;
+  }, {});
+  const execEnv = Object.assign({}, process.env, envVars);
+  exec(`ssh-add ${keyFile}`, {
+    encoding: 'utf8',
+    env: execEnv
+  });
+  // const sshAgent = exec(`eval "$(ssh-agent)"`, { encoding: 'utf8' });
+  // console.error(sshAgent);
+  // const sshAgentPid = sshAgent.split(' ')[sshAgent.split(' ').length - 1];
+  // console.error(sshAgentPid);
+  // TODO(mperrotte): figure out if this is still necessary
+  // exec(`trap "kill ${sshAgentPid}" 0`);
+  const homeDir = os.homedir();
+  fs.mkdirSync(`${homeDir}/.ssh`);
+  const gitConfig = 'StrictHostKeyChecking no\nLogLevel quiet';
+  fs.writeFileSync(`${homeDir}/.ssh/config`, gitConfig, writeOptions);
+  return execEnv;
+}

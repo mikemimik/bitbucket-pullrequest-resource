@@ -1,0 +1,97 @@
+#! /usr/bin/env node
+'use strict';
+
+const readline = require('readline');
+const req = require('sync-request');
+const fs = require('fs');
+// const _ = require('lodash');
+
+// TODO(mperrotte): SORT OUT WITH THIS IS FOR
+const read = readline.createInterface({
+  input: process.stdin,
+  output: process.stdout
+});
+
+let output;
+
+read.on('line', (input) => {
+  console.error(input);
+  console.error('args:', process.argv);
+
+  const destination = process.argv[2];
+  // TESTING(mperrotte): listing out what's in the destination directory
+  const ls = fs.readdirSync(destination, 'utf8');
+  console.error('ls (destination):', ls);
+
+  console.error('env:', process.env);
+  const payload = JSON.parse(input);
+  const api = 'https://bitbucket.org/api/2.0';
+
+  // INFO(mperrotte): source values
+  const username = payload.source.username;
+  const password = payload.source.password;
+  const project = payload.source.project;
+  const repo = payload.source.repository;
+  // const branch = payload.source.branch;
+  const sourceDir = payload.source.source_dir;
+
+  // INFO(mperrotte): version values
+  const fileData = fs.readFileSync(`${destination}/${sourceDir}/pull-request-info`, 'utf8');
+  console.error('fileData:', fileData);
+  const prInfo = JSON.parse(fileData);
+  console.error('prInfo:', prInfo);
+
+  const previousVersion = prInfo.version;
+  const commit = previousVersion.commit;
+
+  // INFO(mperrotte): params values
+  const status = payload.params.status;
+
+  const auth = Buffer.from(`${username}:${password}`).toString('base64');
+  const statusUri = `${api}/repositories/${project}/${repo}/commit/${commit}/statuses/build`;
+
+  // const statuses = [ 'INPROGRESS', 'SUCCESSFUL', 'FAILED', 'STOPPED' ];
+  const url = process.env.ATC_EXTERNAL_URL;
+  const team = process.env.BUILD_TEAM_NAME;
+  const pipelineName = process.env.BUILD_PIPELINE_NAME;
+  const job = process.env.BUILD_JOB_NAME;
+  const build = process.env.BUILD_NAME;
+
+  const postBody = {
+    state: status,
+    // key: uuid(), // some unique id
+    key: `${pipelineName}-${job}`,
+    name: `${pipelineName}-${job}`, // develop-services-pr-${pr_id}-${build_name}
+    url: `${url}/teams/${team}/pipelines/${pipelineName}/jobs/${job}/builds/${build}`, // ${build_url}
+    description: `commit sha: ${commit}`
+  };
+
+  const res = req(
+    'POST',
+    `${statusUri}`,
+    {
+      headers: {
+        Authorization: `Basic ${auth}`
+      },
+      json: postBody
+    }
+  );
+  const data = JSON.parse(res.getBody());
+  console.error(data);
+
+  output = {
+    version: {
+      id: previousVersion.id,
+      branch: previousVersion.branch,
+      commit: previousVersion.commit,
+      updated_on: data.updated_on,
+      ref: data.key,
+      state: data.state
+    }
+  };
+});
+
+read.on('close', () => {
+  console.log(JSON.stringify(output));
+  process.exit(0);
+});
