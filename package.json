@@ -29,12 +29,12 @@
   "homepage": "https://bitbucket.org/resolver/bitbucket-pullrequest-resource#readme",
   "dependencies": {
     "lodash": "^4.17.5",
-    "proxyquire": "^1.8.0",
     "request": "^2.83.0",
     "sync-request": "^5.0.0",
     "uuid": "^3.2.1"
   },
   "devDependencies": {
+    "proxyquire": "^1.8.0",
     "semistandard": "^12.0.1"
   }
 }
