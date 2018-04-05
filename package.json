@@ -4,9 +4,14 @@
   "description": "Concourse resource for checking/fetching bitbucket cloud pullrequests",
   "scripts": {
     "build": "docker build --tag mperrotte/bitbucket-pullrequest-resource .",
-    "push": "docker push mperrotte/bitbucket-pullrequest-resource:latest",
-    "deploy": "npm run build && npm run push",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "tag:latest": "docker tag mperrotte/bitbucket-pullrequest-resource mperrotte/bitbucket-pullrequest-resource:latest",
+    "tag:version": "docker tag mperrotte/bitbucket-pullrequest-resource:latest mperrotte/bitbucket-pullrequest-resource:${npm_package_version}",
+    "tag": "npm run tag:latest && npm run tag:version",
+    "push:latest": "docker push mperrotte/bitbucket-pullrequest-resource:latest",
+    "push:version": "docker push mperrotte/bitbucket-pullrequest-resource:${npm_package_version}",
+    "push": "npm run push:latest && npm run push:version",
+    "deploy": "npm run build && npm run tag && npm run push",
+    "test": "./test.sh"
   },
   "keywords": [
     "concourse",
@@ -17,6 +22,11 @@
   ],
   "author": "Michael Perrotte <mike@mikecorp.ca>",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@bitbucket.org/resolver/bitbucket-pullrequest-resource.git"
+  },
+  "homepage": "https://bitbucket.org/resolver/bitbucket-pullrequest-resource#readme",
   "dependencies": {
     "lodash": "^4.17.5",
     "proxyquire": "^1.8.0",
