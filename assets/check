@@ -13,9 +13,9 @@ const read = readline.createInterface({
 let output;
 
 read.on('line', (input) => {
-  console.error(input);
-  console.error('args:', process.argv);
-  console.error('env:', process.env);
+  console.error(input); // TESTING
+  console.error('args:', process.argv); // TESTING
+  console.error('env:', process.env); // TESTING
 
   const payload = JSON.parse(input);
   const api = 'https://bitbucket.org/api/2.0';
