@@ -66,15 +66,16 @@ read.on('line', (input) => {
   });
   console.error(prData);
 
-  // TODO(mperrotte): fix this logic
-  // TODO(mperrotte): handle situation where there are NO PR's
-  // TODO(mperrotte): figure out what this var looks like
   if (previousVersion) {
+    // NOTE(mperrotte): `previousVersion` exists, so just update what has changed
     const versions = prData.filter(pr => pr.updated_on >= previousVersion.updated_on);
     console.error(versions);
+    output = versions;
   } else {
+    // NOTE(mperrotte): no previous version, return everything
+    output = prData;
   }
-  output = [ _.first(prData) ];
+  // output = [ _.first(prData) ];
   console.error(output);
   read.close();
 });
